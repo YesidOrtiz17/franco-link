@@ -1,80 +1,88 @@
-import express from "express";
-import bcrypt from "bcrypt";
-import User from "../models/users.js";
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import User from '../models/users.js';
 
 const router = express.Router();
 
-router.post("/users", async (req, res) => {
+// Crear usuario (POST)
+router.post('/agrege', async (req, res) => {
     try {
-        const { name, email, password } = req.body;
-
-        // Verifica si el usuario ya existe
-        const existe = await User.findOne({ email });
-        if (existe) {
-            return res.status(400).json({ message: "El correo ya está registrado" });
+        const { nombre, email, password } = req.body;
+        if (!nombre || !email || !password) {
+            return res.status(400).json({ msg: 'Todos los campos son requeridos' });
         }
 
-        // Hashear la contraseña
+        // Verificar si el email ya está registrado
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(409).json({ msg: 'El email ya está registrado' });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({ nombre, email, password: hashedPassword });
 
-        // Crear y guardar el nuevo usuario
-        const newUser = new User({ name, email, password: hashedPassword });
-        const savedUser = await newUser.save();
-
-        res.status(201).json(savedUser);
+        await newUser.save();
+        res.status(200).json({ msg: 'Usuario creado exitosamente' });
     } catch (error) {
-        console.error("Error al registrar usuario:", error.message);
-        res.status(500).json({ message: "Error interno del servidor" });
-    }});
-router.get("/users/:id", (req, res) => {
-    const { id } = req.params;
-    userSchema
-        .find()
-        .then(data => res.json(data))
-        .catch((error)=> res.json({ message: error}));
-
-});
-router.get("/users", async (req, res) => {
-    try {
-        const users = await User.find();
-        res.json(users);
-    } catch (error) {
-        console.error("Error al obtener usuarios:", error.message);
-        res.status(500).json({ message: "Error interno del servidor" });
+        res.status(500).json({ msg: 'Error al crear usuario' });
     }
 });
-router.put("/users/:id", async (req, res) => {
-    const { id } = req.params;
-    const { name, email, password } = req.body;
 
-    try {
-        const updatedUser = await User.findByIdAndUpdate(
-            id,
-            { name, email, password },
-            { new: true }
-        );
-        if (!updatedUser) {
-            return res.status(404).json({ message: "Usuario no encontrado" });
-        }
-        res.json(updatedUser);
-    } catch (error) {
-        console.error("Error al actualizar usuario:", error.message);
-        res.status(500).json({ message: "Error interno del servidor" });
-    }
+// Obtener todos los usuarios (GET)
+router.get('/liste', async (req, res) => {
+    const users = await User.find();
+    res.json(users);
 });
-router.delete("/users/:id", async (req, res) => {
-    const { id } = req.params;
 
+// Obtener un usuario (GET)
+router.get('/liste:id', async (req, res) => {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ msg: 'Usuario no encontrado' });
+    res.json(user);
+});
+
+// Actualizar usuario (PUT)
+router.put('/actualice/:id', async (req, res) => {
+    const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updatedUser);
+});
+
+// Eliminar usuario (DELETE)
+router.delete('/elimine/:id', async (req, res) => {
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ msg: 'Usuario eliminado' });
+});
+
+// Endpoint de login (POST)
+router.post('/login', async (req, res) => {
     try {
-        const deletedUser = await User.findByIdAndDelete(id);
-        if (!deletedUser) {
-            return res.status(404).json({ message: "Usuario no encontrado" });
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ msg: 'Email y password son requeridos' });
         }
-        res.json({ message: "Usuario eliminado exitosamente" });
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({ msg: 'Credenciales inválidas' });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ msg: 'Credenciales inválidas' });
+        }
+
+        // Opcional: devolver solo datos públicos del usuario
+        res.status(200).json({
+            msg: 'Login exitoso',
+            user: {
+                id: user._id,
+                nombre: user.nombre,
+                email: user.email
+            }
+        });
     } catch (error) {
-        console.error("Error al eliminar usuario:", error.message);
-        res.status(500).json({ message: "Error interno del servidor" });
-    }  
+        res.status(500).json({ msg: 'Error en el login', error });
+    }
 });
 
 export default router;
