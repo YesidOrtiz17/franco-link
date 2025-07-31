@@ -2,7 +2,7 @@
   "name": "backendmercadolibre",
   "version": "1.0.0",
   "type": "module",
-  "main": "src/index.js",
+  "main": "index.js",   
   "scripts": {
     "start": "node index.js"
   },
